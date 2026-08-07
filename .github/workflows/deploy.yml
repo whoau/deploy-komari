@@ -3,6 +3,7 @@ name: Deploy Komari Panel to SAP CF
 on:
   workflow_dispatch:
 
+
 env:
   IMAGE: komari/komari:latest
   MEMORY: 1024M
@@ -10,9 +11,11 @@ env:
 
 
 jobs:
+
   deploy:
 
     runs-on: ubuntu-latest
+
 
     steps:
 
@@ -20,9 +23,13 @@ jobs:
       shell: bash
       run: |
         wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo apt-key add -
+
         echo "deb https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+
         sudo apt update
+
         sudo apt install -y cf8-cli
+
 
 
     - name: Login SAP Cloud Foundry
@@ -34,15 +41,22 @@ jobs:
 
       run: |
 
-        echo "Setting API..."
+        CF_API=$(echo "$CF_API" | tr -d '\r\n')
+        CF_USER=$(echo "$CF_USER" | tr -d '\r\n')
+        CF_PASS=$(echo "$CF_PASS" | tr -d '\r\n')
+
+
+        echo "Set API"
 
         cf api "$CF_API"
 
-        echo "Login..."
+
+        echo "Login"
 
         cf auth "$CF_USER" "$CF_PASS"
 
-        echo "Current target:"
+
+        echo "Login OK"
 
         cf target
 
@@ -52,9 +66,37 @@ jobs:
       shell: bash
       run: |
 
-        ORG=$(cf orgs | sed -n '4p')
+        echo "Get organizations"
 
-        SPACE=$(cf spaces | sed -n '4p')
+
+        ORG=$(cf orgs | awk '/^[a-zA-Z0-9_-]+$/ {print; exit}')
+
+
+        echo "ORG=$ORG"
+
+
+        if [ -z "$ORG" ]; then
+          echo "No org found"
+          exit 1
+        fi
+
+
+
+        echo "Get spaces"
+
+
+        SPACE=$(cf spaces -o "$ORG" | awk '/^[a-zA-Z0-9_-]+$/ {print; exit}')
+
+
+        echo "SPACE=$SPACE"
+
+
+
+        if [ -z "$SPACE" ]; then
+          echo "No space found"
+          exit 1
+        fi
+
 
 
         echo "ORG=$ORG" >> $GITHUB_ENV
@@ -62,9 +104,8 @@ jobs:
         echo "SPACE=$SPACE" >> $GITHUB_ENV
 
 
-        echo "ORG=$ORG"
 
-        echo "SPACE=$SPACE"
+        cf target -o "$ORG" -s "$SPACE"
 
 
 
@@ -76,7 +117,12 @@ jobs:
 
         APP_NAME="komari-panel-$(date +%s)"
 
+
         echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+
+
+        echo "Deploying $APP_NAME"
+
 
 
         cf push "$APP_NAME" \
@@ -87,7 +133,7 @@ jobs:
 
 
 
-    - name: Check Status
+    - name: Check Application
 
       shell: bash
 
@@ -96,19 +142,23 @@ jobs:
         cf app "$APP_NAME"
 
 
+
     - name: Show URL
 
       shell: bash
 
       run: |
 
-        ROUTE=$(cf app "$APP_NAME" | grep routes | awk '{print $2}')
+        ROUTE=$(cf app "$APP_NAME" | awk '/routes:/ {print $2}')
 
 
         echo "=========================="
 
-        echo "Komari deployed!"
+        echo "Komari deployed"
 
-        echo "URL: https://$ROUTE"
+        echo ""
+
+        echo "URL:"
+        echo "https://$ROUTE"
 
         echo "=========================="
