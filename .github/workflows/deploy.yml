@@ -101,7 +101,7 @@ jobs:
 
       run: |
 
-        APP_NAME="komari-panel-$(date +%s)"
+        APP_NAME="komari"
 
         echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
 
