@@ -6,7 +6,7 @@ on:
 
 env:
   # 修改这里为实际可用的 Komari Docker 镜像
-  IMAGE: your-komari-image
+  IMAGE: ghcr.io/komari-monitor/komari:latest
   MEMORY: 1024M
   DISK: 2048M
 
