@@ -1,45 +1,114 @@
-name: Deploy Komari to SAP CF
+name: Deploy Komari Panel to SAP CF
 
 on:
   workflow_dispatch:
 
 env:
-  APP_NAME: komari-panel
   IMAGE: komari/komari:latest
   MEMORY: 1024M
   DISK: 2048M
 
 
 jobs:
+  deploy:
 
- deploy:
+    runs-on: ubuntu-latest
 
-  runs-on: ubuntu-latest
+    steps:
 
-
-  steps:
-
-  - name: Install CF CLI
-    run: |
-      wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo apt-key add -
-      echo "deb https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
-      sudo apt update
-      sudo apt install cf8-cli -y
-
-
-  - name: Login SAP CF
-    run: |
-      cf login \
-      -a ${{ secrets.CF_API }} \
-      -u ${{ secrets.CF_USER }} \
-      -p ${{ secrets.CF_PASS }}
+    - name: Install CF CLI
+      shell: bash
+      run: |
+        wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo apt-key add -
+        echo "deb https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+        sudo apt update
+        sudo apt install -y cf8-cli
 
 
-  - name: Deploy Komari
-    run: |
+    - name: Login SAP Cloud Foundry
+      shell: bash
+      env:
+        CF_API: ${{ secrets.CF_API }}
+        CF_USER: ${{ secrets.CF_USER }}
+        CF_PASS: ${{ secrets.CF_PASS }}
 
-      cf push $APP_NAME \
-      --docker-image $IMAGE \
-      -m $MEMORY \
-      -k $DISK \
-      --health-check-type port
+      run: |
+
+        echo "Setting API..."
+
+        cf api "$CF_API"
+
+        echo "Login..."
+
+        cf auth "$CF_USER" "$CF_PASS"
+
+        echo "Current target:"
+
+        cf target
+
+
+
+    - name: Select Org and Space
+      shell: bash
+      run: |
+
+        ORG=$(cf orgs | sed -n '4p')
+
+        SPACE=$(cf spaces | sed -n '4p')
+
+
+        echo "ORG=$ORG" >> $GITHUB_ENV
+
+        echo "SPACE=$SPACE" >> $GITHUB_ENV
+
+
+        echo "ORG=$ORG"
+
+        echo "SPACE=$SPACE"
+
+
+
+    - name: Deploy Komari
+
+      shell: bash
+
+      run: |
+
+        APP_NAME="komari-panel-$(date +%s)"
+
+        echo "APP_NAME=$APP_NAME" >> $GITHUB_ENV
+
+
+        cf push "$APP_NAME" \
+          --docker-image "$IMAGE" \
+          -m "$MEMORY" \
+          -k "$DISK" \
+          --health-check-type port
+
+
+
+    - name: Check Status
+
+      shell: bash
+
+      run: |
+
+        cf app "$APP_NAME"
+
+
+    - name: Show URL
+
+      shell: bash
+
+      run: |
+
+        ROUTE=$(cf app "$APP_NAME" | grep routes | awk '{print $2}')
+
+
+        echo "=========================="
+
+        echo "Komari deployed!"
+
+        echo "URL: https://$ROUTE"
+
+        echo "=========================="
