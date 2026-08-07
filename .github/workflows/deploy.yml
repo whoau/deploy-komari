@@ -5,7 +5,8 @@ on:
 
 
 env:
-  IMAGE: komari/komari:latest
+  # 修改这里为实际可用的 Komari Docker 镜像
+  IMAGE: your-komari-image
   MEMORY: 1024M
   DISK: 2048M
 
@@ -43,13 +44,9 @@ jobs:
         CF_USER=$(echo "$CF_USER" | tr -d '\r\n')
         CF_PASS=$(echo "$CF_PASS" | tr -d '\r\n')
 
-        echo "Set API"
         cf api "$CF_API"
 
-        echo "Login"
         cf auth "$CF_USER" "$CF_PASS"
-
-        echo "Login success"
 
         cf target
 
@@ -59,49 +56,29 @@ jobs:
       shell: bash
       run: |
 
-        echo "========== ORG LIST =========="
+        echo "Getting org..."
 
-        cf orgs
+        ORG=$(cf orgs | sed '1,/name/d' | sed '/^$/d' | head -n 1)
 
-
-        ORG=$(cf orgs | \
-        sed '1,/name/d' | \
-        sed '/^$/d' | \
-        head -n 1)
-
-
-        echo "Detected ORG:"
-        echo "$ORG"
-
+        echo "ORG=$ORG"
 
 
         if [ -z "$ORG" ]; then
-          echo "No organization found"
+          echo "No org found"
           exit 1
         fi
-
-
-
-        echo "========== SPACE LIST =========="
 
 
         cf target -o "$ORG"
 
 
-        cf spaces
+        echo "Getting space..."
 
 
-
-        SPACE=$(cf spaces | \
-        sed '1,/name/d' | \
-        sed '/^$/d' | \
-        head -n 1)
+        SPACE=$(cf spaces | sed '1,/name/d' | sed '/^$/d' | head -n 1)
 
 
-
-        echo "Detected SPACE:"
-        echo "$SPACE"
-
+        echo "SPACE=$SPACE"
 
 
         if [ -z "$SPACE" ]; then
@@ -110,21 +87,11 @@ jobs:
         fi
 
 
-
         echo "ORG=$ORG" >> $GITHUB_ENV
         echo "SPACE=$SPACE" >> $GITHUB_ENV
 
 
-
-        echo "Targeting CF..."
-
-        cf target \
-          -o "$ORG" \
-          -s "$SPACE"
-
-
-
-        cf target
+        cf target -o "$ORG" -s "$SPACE"
 
 
 
@@ -142,7 +109,6 @@ jobs:
         echo "Deploying $APP_NAME"
 
 
-
         cf push "$APP_NAME" \
           --docker-image "$IMAGE" \
           -m "$MEMORY" \
@@ -151,7 +117,7 @@ jobs:
 
 
 
-    - name: Check Application
+    - name: Check App
 
       shell: bash
 
@@ -167,16 +133,12 @@ jobs:
 
       run: |
 
-        ROUTE=$(cf app "$APP_NAME" | grep routes | awk '{print $2}')
+        ROUTE=$(cf app "$APP_NAME" | awk '/routes:/ {print $2}')
 
 
-        echo "================================"
+        echo "=========================="
 
-        echo "Komari deployed successfully"
-
-        echo ""
-
-        echo "URL:"
+        echo "Komari URL:"
         echo "https://$ROUTE"
 
-        echo "================================"
+        echo "=========================="
