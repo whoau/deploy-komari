@@ -1,0 +1,45 @@
+name: Deploy Komari to SAP CF
+
+on:
+  workflow_dispatch:
+
+env:
+  APP_NAME: komari-panel
+  IMAGE: komari/komari:latest
+  MEMORY: 1024M
+  DISK: 2048M
+
+
+jobs:
+
+ deploy:
+
+  runs-on: ubuntu-latest
+
+
+  steps:
+
+  - name: Install CF CLI
+    run: |
+      wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo apt-key add -
+      echo "deb https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+      sudo apt update
+      sudo apt install cf8-cli -y
+
+
+  - name: Login SAP CF
+    run: |
+      cf login \
+      -a ${{ secrets.CF_API }} \
+      -u ${{ secrets.CF_USER }} \
+      -p ${{ secrets.CF_PASS }}
+
+
+  - name: Deploy Komari
+    run: |
+
+      cf push $APP_NAME \
+      --docker-image $IMAGE \
+      -m $MEMORY \
+      -k $DISK \
+      --health-check-type port
